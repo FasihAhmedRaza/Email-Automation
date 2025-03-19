@@ -1,0 +1,6 @@
+EMAIL_ADDRESS=chatfasih@gmail.com
+EMAIL_PASSWORD=
+IMAP_SERVER=imap.gmail.com
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+OPENAI_API_KEY=

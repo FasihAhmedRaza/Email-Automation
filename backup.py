@@ -119,3 +119,85 @@ else:
 # Automatically rerun the app every 5 minutes
 time.sleep(300)  # 5 minutes (300 seconds)
 st.rerun()
+
+
+# # 
+# <!DOCTYPE html>
+# <html lang="en">
+# <head>
+#     <meta charset="UTF-8">
+#     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+#     <title>Email Automation Bot</title>
+#     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+#     <meta http-equiv="refresh" content="60">
+# </head>
+# <body>
+#     <div class="container">
+#         <header>
+#             <h1>Email Automation Bot</h1>
+#             <div class="status-bar">
+#                 Auto-refreshes every minute
+#             </div>
+#         </header>
+        
+#         <section class="controls">
+#             <h2>Email Logs</h2>
+#             <div class="actions">
+#                 <form action="{{ url_for('clear_logs') }}" method="post">
+#                     <button type="submit" class="btn danger">Clear All Logs</button>
+#                 </form>
+#             </div>
+#         </section>
+        
+#         <section class="logs">
+#             {% if email_logs %}
+#             <p class="log-count">Showing {{ email_logs|length }} email(s)</p>
+#             <div class="table-container">
+#                 <table>
+#                     <thead>
+#                         <tr>
+#                             <th>Time</th>
+#                             <th>From</th>
+#                             <th>Subject</th>
+#                             <th>Email Content</th>
+#                             <th>AI Reply</th>
+#                         </tr>
+#                     </thead>
+#                     <tbody>
+#                         {% for log in email_logs %}
+#                         <tr>
+#                             <td>{{ log.get('timestamp', 'N/A') }}</td>
+#                             <td>{{ log.get('from', 'N/A') }}</td>
+#                             <td>{{ log.get('subject', 'N/A') }}</td>
+#                             <td class="email-content">
+#                                 <div class="content-wrapper">
+#                                     {{ log.get('body', 'N/A') }}
+#                                 </div>
+#                             </td>
+#                             <td class="reply-content">
+#                                 <div class="content-wrapper">
+#                                     {{ log.get('reply', 'N/A') }}
+#                                 </div>
+#                             </td>
+#                         </tr>
+#                         {% endfor %}
+#                     </tbody>
+#                 </table>
+#             </div>
+#             {% else %}
+#             <div class="empty-state">
+#                 <p>No emails processed yet.</p>
+#                 <p class="info">The bot is running in the background and checking for new emails every minute.</p>
+#             </div>
+#             {% endif %}
+#         </section>
+        
+#         <footer>
+#             <p>Email Automation Bot &copy; {{ current_year }}</p>
+#         </footer>
+#     </div>
+# </body>
+# </html>
+
+
+# 

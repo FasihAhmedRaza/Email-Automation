@@ -166,3 +166,75 @@ footer {
         max-width: 200px;
     }
 }
+
+
+/* #login */
+
+
+.user-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+    gap: 10px;
+    font-size: 0.9rem;
+}
+
+.user-controls span {
+    color: #4a5568;
+}
+
+.user-controls .btn {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+
+/* Add this to style the login form */
+.login-container {
+    max-width: 400px;
+    margin: 100px auto;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.error-message {
+    color: #e53e3e;
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+/* Add this for the spam indicator */
+.spam-indicator {
+    display: inline-block;
+    background-color: #f56565;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-left: 5px;
+}
+
+/* Style for encrypted content */
+.encrypted-content {
+    font-style: italic;
+    color: #718096;
+}

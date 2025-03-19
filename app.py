@@ -13,11 +13,24 @@ import time
 import json
 from datetime import datetime
 
+#login
+# Step 1: Add necessary imports at the top of app.py
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import URLSafeTimedSerializer
+import re
+from cryptography.fernet import Fernet
+import base64
+
+
+
+
 # Load environment variables
 load_dotenv()
 
 # Flask app
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.getenv("SECRET_KEY", "generate-a-secure-random-key")  # Use environment variable in production
 
 # Email credentials
 EMAIL = os.getenv("EMAIL_ADDRESS")
@@ -35,6 +48,162 @@ LOG_FILE = "email_logs.json"
 
 # Keep track of emails we've already processed
 processed_emails = set()
+
+
+# Initialize LoginManager
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+
+# Step 3: Create a User model
+class User(UserMixin):
+    def __init__(self, id, username, password_hash, email, role):
+        self.id = id
+        self.username = username
+        self.password_hash = password_hash
+        self.email = email
+        self.role = role  # 'admin' or 'viewer'
+        
+# Step 4: Create a user database (in a real app, you'd use a database)
+# Add this after the User class
+users = {
+    '1': User('1', 'admin', generate_password_hash('admin_password'), os.getenv("ADMIN_EMAIL", "admin@example.com"), 'admin'),
+    '2': User('2', 'viewer', generate_password_hash('viewer_password'), "viewer@example.com", 'viewer')
+}
+
+# Step 5: User loader function for Flask-Login
+@login_manager.user_loader
+def load_user(user_id):
+    return users.get(user_id)
+
+# Step 6: Setup encryption for sensitive data
+# Generate a key for encryption (in production, store this securely)
+def generate_key():
+    return base64.urlsafe_b64encode(os.urandom(32))
+
+# In production, load this from environment or secure storage
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", generate_key())
+cipher_suite = Fernet(ENCRYPTION_KEY)
+
+def encrypt_data(data):
+    """Encrypt sensitive data"""
+    if not data:
+        return ""
+    return cipher_suite.encrypt(data.encode()).decode()
+
+def decrypt_data(encrypted_data):
+    """Decrypt sensitive data"""
+    if not encrypted_data:
+        return ""
+    try:
+        return cipher_suite.decrypt(encrypted_data.encode()).decode()
+    except:
+        return "[Decryption failed]"
+    
+# Step 7: Add spam detection function
+def is_spam(subject, body, sender):
+    """Detect potential spam emails"""
+    # Check for common spam keywords
+    spam_keywords = ["viagra", "lottery", "winner", "millions", "prince", "inheritance", 
+                     "bitcoin", "cryptocurrency", "urgent payment", "money transfer"]
+    
+    # Convert to lowercase for case-insensitive matching
+    subject_lower = subject.lower()
+    body_lower = body.lower()
+    
+    # Check for spam keywords
+    if any(keyword in subject_lower or keyword in body_lower for keyword in spam_keywords):
+        return True
+    
+    # Check for excessive capitalization (spam indicator)
+    if len(subject) > 10:  # Only check if subject is long enough
+        caps_ratio = sum(1 for c in subject if c.isupper()) / len(subject)
+        if caps_ratio > 0.5:  # If more than 50% is uppercase
+            return True
+    
+    # Check for excessive exclamation marks or question marks
+    if subject.count('!') > 3 or subject.count('?') > 3:
+        return True
+    
+    # Check for suspicious sender patterns
+    suspicious_domains = ["xyz.com", "temp-mail.org", "guerrillamail.com", "mailinator.com"]
+    if any(domain in sender.lower() for domain in suspicious_domains):
+        return True
+        
+    # Check for suspicious URL patterns
+    urls = re.findall(r'https?://(?:[-\w.]|(?:%[\da-fA-F]{2}))+', body)
+    suspicious_url_patterns = ["bit.ly", "goo.gl", "tinyurl", "click.here", "free", "offer"]
+    if any(pattern in url.lower() for url in urls for pattern in suspicious_url_patterns):
+        return True
+    
+    return False
+
+
+# Step 8: Add login route
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Simple brute force protection
+        if not hasattr(app, 'login_attempts'):
+            app.login_attempts = {}
+        
+        # Get client IP
+        ip = request.remote_addr
+        current_time = time.time()
+        
+        # Check if IP is blocked
+        if ip in app.login_attempts:
+            attempts, last_attempt_time = app.login_attempts[ip]
+            
+            # Reset attempts if more than 30 minutes have passed
+            if current_time - last_attempt_time > 1800:
+                app.login_attempts[ip] = (0, current_time)
+            elif attempts >= 5:
+                return render_template('login.html', error='Too many failed attempts. Try again later.')
+        
+        # Check credentials
+        user_found = False
+        for user_id, user in users.items():
+            if user.username == username and check_password_hash(user.password_hash, password):
+                login_user(user)
+                
+                # Reset login attempts on successful login
+                if ip in app.login_attempts:
+                    app.login_attempts[ip] = (0, current_time)
+                
+                return redirect(url_for('index'))
+        
+        # Increment failed attempts
+        if ip in app.login_attempts:
+            attempts, _ = app.login_attempts[ip]
+            app.login_attempts[ip] = (attempts + 1, current_time)
+        else:
+            app.login_attempts[ip] = (1, current_time)
+        
+        return render_template('login.html', error='Invalid username or password')
+    
+    return render_template('login.html')
+
+
+# Step 9: Add logout route
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+# Step 10: Add role-based access control
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Load existing logs from file if it exists
 def load_logs():
@@ -161,6 +330,9 @@ def fetch_and_reply_emails():
                             email_body = decode_email_body(msg)
                             
                             print(f"[{datetime.now()}] Email from: {from_header}, Subject: {subject}")
+                            
+                                # Check if the email is spam
+
 
                             # Generate reply using OpenAI
                             print(f"[{datetime.now()}] Generating reply using OpenAI...")
@@ -222,13 +394,33 @@ def fetch_and_reply_emails():
 
 # Routes
 @app.route('/')
+@login_required
 def index():
     # Sort logs by timestamp (newest first)
     sorted_logs = sorted(email_logs, key=lambda x: x.get("timestamp", ""), reverse=True)
     # Pass the current datetime to the template
     return render_template('index.html', email_logs=sorted_logs, current_year=datetime.now().year)
+    # Decrypt sensitive data for display
+    decrypted_logs = []
+    for log in email_logs:
+        decrypted_log = log.copy()
+        if 'body' in log:
+            try:
+                decrypted_log['body'] = decrypt_data(log['body'])
+            except:
+                decrypted_log['body'] = "[Encrypted]"
+        if 'reply' in log:
+            try:
+                decrypted_log['reply'] = decrypt_data(log['reply'])
+            except:
+                decrypted_log['reply'] = "[Encrypted]"
+        decrypted_logs.append(decrypted_log)
+    
+    return render_template('index.html', email_logs=decrypted_logs, current_year=datetime.now().year)
+
 
 @app.route('/clear_logs', methods=['POST'])
+# @admin_required  # Only admins can clear logs
 def clear_logs():
     global email_logs
     global processed_emails
@@ -245,6 +437,41 @@ def status():
         "processed_count": len(processed_emails),
         "last_check": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     })
+    
+#Step 13: Add a new route for changing passwords
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+        
+        # Validate input
+        if not old_password or not new_password or not confirm_password:
+            return render_template('change_password.html', error='All fields are required')
+        
+        if new_password != confirm_password:
+            return render_template('change_password.html', error='New passwords do not match')
+        
+        # Check password strength
+        if len(new_password) < 8:
+            return render_template('change_password.html', error='Password must be at least 8 characters')
+        
+        if not re.search(r'[A-Z]', new_password) or not re.search(r'[a-z]', new_password) or not re.search(r'[0-9]', new_password):
+            return render_template('change_password.html', error='Password must contain uppercase, lowercase, and numbers')
+        
+        # Verify old password
+        if not check_password_hash(current_user.password_hash, old_password):
+            return render_template('change_password.html', error='Current password is incorrect')
+        
+        # Update password
+        current_user.password_hash = generate_password_hash(new_password)
+        users[current_user.id] = current_user
+        
+        return redirect(url_for('index'))
+    
+    return render_template('change_password.html')
 
 if __name__ == '__main__':
     # Start the email checking thread
